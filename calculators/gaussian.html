@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+      <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+
+    <title>Title</title>
+  </head>
+<body onload="updateTable()">
+    <h1>This is a calculator for the gaussian distribution.</h1>
+    <form name="table_values" onchange="updateTable()">
+        <div class="form-group">
+        <label for="meanId">Mean</label><input id="meanId" type="number" value="0">
+        <label for="standardDeviationId">Standard Deviation</label><input id="standardDeviationId" type="number" value="1">
+        </div>
+        <div class="form-group">
+        <label for="startId">Start</label><input id="startId" type="number" value="-3.5">
+        <label for="endId">End</label><input id="endId" type="number" value="3.5">
+        <label for="zprecisionOutputId">Z Precision</label><input name="zprecisionInputName" id="zprecisionInputId" type="range" min="0" max="5" step="1" value="2"   oninput="zprecisionOutputId.value = zprecisionInputId.value" >
+        <output name="zprecision" id="zprecisionOutputId">2</output>
+        </div>
+
+        <div class="form-group">
+        <label for="dprecisionOutputId">Data Precision</label><input name="dprecisionInputName" id="dprecisionInputId" type="range" min="1" max="6" step="1" value="4"  oninput="dprecisionOutputId.value = dprecisionInputId.value" >
+        <output name="dprecision" id="dprecisionOutputId">4</output>
+        </div>
+    </form>
+
+    <h1 id="progressBarId"></h1>
+    <div id="table"></div>
+
+    <script>
+        function gaussian_pdf(x, mean, standardDeviation) {
+            var m = standardDeviation * Math.sqrt(2 * Math.PI);
+            var e = Math.exp(-Math.pow(x - mean, 2) / (2 * Math.pow(standardDeviation, 2)));
+            return e / m;
+        }
+
+        function gaussian_cdf(x, mean, standardDeviation) {
+             return 0.5 * erfc(-(x - mean) / (standardDeviation * Math.sqrt(2)));
+        }
+
+
+        function erfc(x) {
+            const z = Math.abs(x);
+            const t = 1 / (1 + z / 2);
+            const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 +
+                    t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 +
+                    t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 +
+                    t * (-0.82215223 + t * 0.17087277)))))))));
+            return x >= 0 ? r : 2 - r;
+    }
+
+
+        async function updateTable() {
+            const table = document.getElementById("table");
+            const progressBar = document.getElementById("progressBarId");
+
+            const  mean = parseFloat(document.getElementById("meanId").value);
+            const  standardDeviation = parseFloat(document.getElementById("standardDeviationId").value);
+
+            const  start = parseFloat(document.getElementById("startId").value);
+            const  end = parseFloat(document.getElementById("endId").value);
+
+            const  zprecision = parseFloat(document.getElementById("zprecisionOutputId").value);
+            const  dprecision = parseFloat(document.getElementById("dprecisionOutputId").value);
+            table.hidden = true;
+            progressBar.hidden = false;
+
+            function progressCallback(percentComplete) {
+                progressBar.innerText = `${(percentComplete*100).toFixed(2)}%`
+            }
+            const newTable =  await new Promise(resolve=>resolve(createTable(start, end, zprecision, dprecision, f => gaussian_cdf(f, mean, standardDeviation), progressCallback)));
+            table.innerHTML = "";
+            table.append(newTable);
+            progressBar.hidden = true;
+            table.hidden = false;
+        }
+
+
+        function createTable(start, end, zpercision, dpercision, callFunction, callback = null, callbackCount=1) {
+            const callbackRange = (end - start);
+            var nextCallback = callbackCount / callbackRange;
+
+            if(callback != null) {
+                callback(0.0);
+            }
+
+            const table = document.createElement("table");
+
+            const yper = Math.floor(zpercision/2);
+            const xper = Math.ceil(zpercision/2)+yper;
+
+            const ydelta = (Math.pow(0.1, yper));
+            const xdelta = Math.pow(0.1, xper);
+
+             var t = document.createElement("tr");
+             var th = document.createElement("th");
+             th.textContent = "X";
+             t.append(th);
+
+            for (var i = 0; i < ydelta; i = parseFloat((i+xdelta).toFixed(9))){
+                th = document.createElement("th");
+                th.textContent = i.toFixed(xper);
+                t.append(th);
+            }
+
+            table.append(t);
+            for (var i = start; i <= end; i = parseFloat((i+ydelta).toFixed(9))){
+                t = document.createElement("tr");
+                th = document.createElement("th");
+                th.textContent = i.toFixed(yper);
+                t.append(th);
+                for (var j = 0; j < ydelta; j= parseFloat((j+xdelta).toFixed(9))){
+                    th = document.createElement("td");
+                    var x = (i + j);
+                    th.textContent = callFunction(x).toFixed(dpercision);
+                    t.append(th);
+                    if(callback != null) {
+                        if(x >= nextCallback){
+                            callback(x/end);
+                            nextCallback += callbackCount/callbackRange;
+                        }
+                    }
+                }
+                table.append(t);
+            }
+
+            if(callback != null) {
+                callback(1.0);
+            }
+
+            return table;
+        }
+    </script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+</body>
+</html>
